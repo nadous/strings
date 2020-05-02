@@ -21,9 +21,9 @@ pub const string = struct {
         for (str) |c, i| {
             buf[i] = c;
         }
-        return string {
+        return string{
             .buffer = buf,
-            .allocator = std.heap.c_allocator
+            .allocator = std.heap.c_allocator,
         };
     }
 
@@ -38,7 +38,8 @@ pub const string = struct {
 
     // check if the string constains a substring
     pub fn contains(self: *const string, subs: []const u8) bool {
-        var result = kmp(self, subs) catch unreachable;
+        const result = kmp(self, subs) catch unreachable;
+        defer self.allocator.free(result);
         return result.len > 0;
     }
 
@@ -61,7 +62,7 @@ pub const string = struct {
         if (needle.len == 1 and needle[0] == ' ') {
             indices = try self.single_space_indices();
         } else {
-           indices = try self.kmp(needle);
+            indices = try self.kmp(needle);
         }
         return indices;
     }
@@ -70,48 +71,48 @@ pub const string = struct {
     pub fn kmp(self: *const string, needle: []const u8) ![]usize {
         const m = needle.len;
 
-        var border = try self.allocator.alloc(i64, m+1);
+        var border = try self.allocator.alloc(i64, m + 1);
         defer self.allocator.free(border);
         border[0] = -1;
 
         var i: usize = 0;
-        while (i < m): (i += 1) {
-            border[i+1] = border[i];
-            while (border[i+1] > -1 and needle[usize(border[i+1])] != needle[i]) {
-                border[i+1] = border[usize(border[i+1])];
+        while (i < m) : (i += 1) {
+            border[i + 1] = border[i];
+            while (border[i + 1] > -1 and needle[@intCast(usize, border[i + 1])] != needle[i]) {
+                border[i + 1] = border[@intCast(usize, border[i + 1])];
             }
-            border[i+1]+=1;
+            border[i + 1] += 1;
         }
 
         // max possible needles you can find
-        const max_found = self.buffer.len / needle.len; 
-        
+        const max_found = self.buffer.len / needle.len;
+
         var results = try self.allocator.alloc(usize, max_found);
-        var n = self.buffer.len;
+        const n = self.buffer.len;
         var seen: i64 = 0;
         var j: usize = 0;
         var found: usize = 0;
 
-        while (j < n): (j += 1) {
-            while (seen > -1 and needle[usize(seen)] != self.buffer[j])  {
-                seen = border[usize(seen)];
+        while (j < n) : (j += 1) {
+            while (seen > -1 and needle[@intCast(usize, seen)] != self.buffer[j]) {
+                seen = border[@intCast(usize, seen)];
             }
-            seen+=1;
-            if (seen == i64(m)) {
+            seen += 1;
+            if (seen == @intCast(usize, m)) {
                 found += 1;
-                results[found-1] = j-m+1;
+                results[found - 1] = j - m + 1;
                 seen = border[m];
             }
         }
-        results = try self.allocator.realloc(usize, results, found);
+        results = try self.allocator.realloc(results, found);
         return results;
     }
 
-
     // compute the levenshtein edit distance to another string
     pub fn levenshtein(self: *const string, other: []const u8) !usize {
-        var prevrow = try self.allocator.alloc(usize, other.len+1);
-        var currrow = try self.allocator.alloc(usize, other.len+1);
+        const prevrow = try self.allocator.alloc(usize, other.len + 1);
+        const currrow = try self.allocator.alloc(usize, other.len + 1);
+
         defer self.allocator.free(prevrow);
         defer self.allocator.free(currrow);
 
@@ -121,27 +122,24 @@ pub const string = struct {
     // compute the levenshtein distance to another string
     // this function expects pre-allocated buffers as input
     // the calling code is responsible for freeing this memory
-    pub fn buffered_levenshtein(self: *const string, other: []const u8, 
-                                prevrow: []usize, currrow: []usize) usize {
-        assert(prevrow.len >= other.len+1);
-        assert(currrow.len >= other.len+1);
+    pub fn buffered_levenshtein(self: *const string, other: []const u8, prevrow: []usize, currrow: []usize) usize {
+        assert(prevrow.len >= other.len + 1);
+        assert(currrow.len >= other.len + 1);
 
         var i: usize = 0;
-        while (i <= other.len): (i += 1) {
+        while (i <= other.len) : (i += 1) {
             prevrow[i] = i;
         }
 
         i = 1;
-        while (i <= self.buffer.len): (i += 1) {
+        while (i <= self.buffer.len) : (i += 1) {
             currrow[0] = i;
             var j: usize = 1;
-            while (j <= other.len): (j += 1) {
-                if (self.buffer[i-1] == other[j-1]) {
-                    currrow[j] = prevrow[j-1];
+            while (j <= other.len) : (j += 1) {
+                if (self.buffer[i - 1] == other[j - 1]) {
+                    currrow[j] = prevrow[j - 1];
                 } else {
-                    currrow[j] = @inlineCall(min, prevrow[j]+1,
-                    currrow[j-1]+1,
-                    prevrow[j-1]+1);
+                    currrow[j] = @call(.{ .modifier = .always_inline }, min, .{ prevrow[j] + 1, currrow[j - 1] + 1, prevrow[j - 1] + 1 });
                 }
             }
             mem.copy(usize, prevrow, currrow);
@@ -151,21 +149,22 @@ pub const string = struct {
 
     // replace all instances of "before" with "after"
     pub fn replace(self: *string, before: []const u8, after: []const u8) !void {
-        var indices = try self.kmp(before);
+        const indices = try self.kmp(before);
         if (indices.len == 0) return;
-        var diff = i128(before.len) - i128(after.len);
-        // var it = indices.iterator();
+        defer self.allocator.free(indices);
+
+        var diff = @intCast(i128, before.len) - @intCast(i128, after.len);
         var new_size: usize = 0;
         if (diff == 0) { // no need to resize buffer
-            for (indices) |n| { 
-                mem.copy(u8, self.buffer[n..n+after.len], after);
+            for (indices) |n| {
+                mem.copy(u8, self.buffer[n .. n + after.len], after);
             }
             return;
         } else if (diff < 0) { // grow buffer
             diff = diff * -1;
-            new_size = self.buffer.len + (indices.len*usize(diff));
+            new_size = self.buffer.len + (indices.len * @intCast(usize, diff));
         } else { // shrink buffer
-            new_size = self.buffer.len - (indices.len*usize(diff));
+            new_size = self.buffer.len - (indices.len * @intCast(usize, diff));
         }
         var new_buff = try self.allocator.alloc(u8, new_size);
         var i: usize = 0;
@@ -176,8 +175,8 @@ pub const string = struct {
                     new_buff[j] = self.buffer[i];
                     i += 1;
                     j += 1;
-                } else  {
-                    mem.copy(u8, new_buff[j..j+after.len], after);
+                } else {
+                    mem.copy(u8, new_buff[j .. j + after.len], after);
                     i += before.len;
                     j += after.len;
                     break;
@@ -200,7 +199,7 @@ pub const string = struct {
     pub fn lower(self: *const string) void {
         for (self.buffer) |c, i| {
             if (ascii_upper_start <= c and c <= ascii_upper_end) {
-                self.buffer[i] = ascii_lower[@inlineCall(upper_map, c)];
+                self.buffer[i] = ascii_lower[@call(.{ .modifier = .always_inline }, upper_map, .{c})];
             }
         }
     }
@@ -209,7 +208,7 @@ pub const string = struct {
     pub fn upper(self: *const string) void {
         for (self.buffer) |c, i| {
             if (ascii_lower_start <= c and c <= ascii_lower_end) {
-                self.buffer[i] = ascii_upper[@inlineCall(lower_map, c)];
+                self.buffer[i] = ascii_upper[@call(.{ .modifier = .always_inline }, lower_map, .{c})];
             }
         }
     }
@@ -218,9 +217,9 @@ pub const string = struct {
     pub fn swapcase(self: *const string) void {
         for (self.buffer) |c, i| {
             if (ascii_lower_start <= c and c <= ascii_lower_end) {
-                self.buffer[i] = ascii_upper[@inlineCall(lower_map, c)];
+                self.buffer[i] = ascii_upper[@call(.{ .modifier = .always_inline }, lower_map, .{c})];
             } else if (ascii_upper_start <= c and c <= ascii_upper_end) {
-                self.buffer[i] = ascii_lower[@inlineCall(upper_map, c)];
+                self.buffer[i] = ascii_lower[@call(.{ .modifier = .always_inline }, upper_map, .{c})];
             }
         }
     }
@@ -228,8 +227,7 @@ pub const string = struct {
     pub fn concat(self: *string, other: []const u8) !void {
         if (other.len == 0) return;
         const orig_len = self.buffer.len;
-        self.buffer = try self.allocator.realloc(u8, self.buffer, 
-                                                 self.size() + other.len);
+        self.buffer = try self.allocator.realloc(self.buffer, self.size() + other.len);
         mem.copy(u8, self.buffer[orig_len..], other);
     }
 
@@ -241,8 +239,8 @@ pub const string = struct {
         // find first occurence of non-whitespace char
         for (self.buffer) |c, i| {
             switch (c) {
-                ' ', '\t', '\n', 11, '\r'  => continue,
-                else =>   {
+                ' ', '\t', '\n', 11, '\r' => continue,
+                else => {
                     start = i;
                     break;
                 },
@@ -250,19 +248,19 @@ pub const string = struct {
         }
 
         // find last occurance of non-whitespace char
-        var i: usize = self.buffer.len-1;
-        while (i >= 0): (i -= 1) {
+        var i: usize = self.buffer.len - 1;
+        while (i >= 0) : (i -= 1) {
             const c = self.buffer[i];
             switch (c) {
-                ' ', '\t', '\n', 11, '\r'  => continue,
-                else =>   {
-                    end = i+1;
+                ' ', '\t', '\n', 11, '\r' => continue,
+                else => {
+                    end = i + 1;
                     break;
                 },
             }
         }
 
-        var new_buff = try self.allocator.alloc(u8, end - start);
+        const new_buff = try self.allocator.alloc(u8, end - start);
         mem.copy(u8, new_buff, self.buffer[start..end]);
 
         self.allocator.free(self.buffer);
@@ -275,15 +273,15 @@ pub const string = struct {
         // find first occurence of non-whitespace char
         for (self.buffer) |c, i| {
             switch (c) {
-                ' ', '\t', '\n', 11, '\r'  => continue,
-                else =>   {
+                ' ', '\t', '\n', 11, '\r' => continue,
+                else => {
                     start = i;
                     break;
                 },
             }
         }
 
-        var new_buff = try self.allocator.alloc(u8, self.buffer.len - start);
+        const new_buff = try self.allocator.alloc(u8, self.buffer.len - start);
         mem.copy(u8, new_buff, self.buffer[start..self.buffer.len]);
 
         self.allocator.free(self.buffer);
@@ -295,19 +293,19 @@ pub const string = struct {
         var end: usize = self.buffer.len;
 
         // find last occurance of non-whitespace char
-        var i: usize = self.buffer.len-1;
-        while (i >= 0): (i -= 1) {
+        var i: usize = self.buffer.len - 1;
+        while (i >= 0) : (i -= 1) {
             var c = self.buffer[i];
             switch (c) {
-                ' ', '\t', '\n', 11, '\r'  => continue,
-                else =>   {
-                    end = i+1;
+                ' ', '\t', '\n', 11, '\r' => continue,
+                else => {
+                    end = i + 1;
                     break;
                 },
             }
         }
 
-        var new_buff = try self.allocator.alloc(u8, end);
+        const new_buff = try self.allocator.alloc(u8, end);
         mem.copy(u8, new_buff, self.buffer[0..end]);
 
         self.allocator.free(self.buffer);
@@ -315,15 +313,16 @@ pub const string = struct {
     }
 
     // split the string by a specified separator, returning
-    // an ArrayList of []u8. 
+    // an ArrayList of []u8.
     pub fn split_to_u8(self: *const string, sep: []const u8) ![][]const u8 {
-        var indices = try @inlineCall(self.find_all, sep);
+        const indices = try @call(.{ .modifier = .always_inline }, self.find_all, .{sep});
+        defer self.allocator.free(indices);
 
-        var results = try self.allocator.alloc([]const u8, indices.len+1);
+        var results = try self.allocator.alloc([]const u8, indices.len + 1);
         var i: usize = 0;
-        for (indices) |n, j|  {
+        for (indices) |n, j| {
             results[j] = self.buffer[i..n];
-            i = n+sep.len;
+            i = n + sep.len;
         }
         if (i < self.buffer.len) {
             results[indices.len] = self.buffer[i..];
@@ -334,13 +333,14 @@ pub const string = struct {
     // split the string by a specified separator, returning
     // an slice of string pointers.
     pub fn split(self: *const string, sep: []const u8) ![]string {
-        var indices = try self.find_all(sep);
+        const indices = try self.find_all(sep);
+        defer self.allocator.free(indices);
 
-        var results = try self.allocator.alloc(string, indices.len+1);
+        var results = try self.allocator.alloc(string, indices.len + 1);
         var i: usize = 0;
         for (indices) |n, j| {
             results[j] = try string.init(self.buffer[i..n]);
-            i = n+sep.len;
+            i = n + sep.len;
         }
 
         if (i < self.buffer.len) {
@@ -351,7 +351,8 @@ pub const string = struct {
 
     // count the number of occurances of a substring
     pub fn count(self: *const string, substr: []const u8) !usize {
-        var subs = try self.find_all(substr);
+        const subs = try self.find_all(substr);
+        defer self.allocator.free(subs);
         return subs.len;
     }
 
@@ -369,7 +370,7 @@ pub const string = struct {
                 i += 1;
             }
         }
-        results = try self.allocator.realloc(usize, results, i);
+        results = try self.allocator.realloc(results, i);
         return results[0..];
     }
 
@@ -378,11 +379,10 @@ pub const string = struct {
         var i: usize = 0;
         for (self.buffer) |c, j| {
             switch (c) {
-                ' ', '\t', '\n', 11, '\r'  =>
-                {
+                ' ', '\t', '\n', 11, '\r' => {
                     results[i] = j;
                     i += 1;
-                }, 
+                },
                 else => continue,
             }
         }
