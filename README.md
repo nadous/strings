@@ -1,15 +1,16 @@
 # strings
 
-strings for zig
+strings for zig (0.6.0)
 
-
-check out the test/test.zig file for examples
-
+check out the tests/test.zig file for examples
 
 to run all the tests:
-
 ```
-$ git clone https://github.com/clownpriest/strings
+$ git clone https://github.com/nadous/strings
 $ cd strings
-$ zig test test/test.zig
+$ zig build test
+```
+to run a simple benchmark:
+```
+$ zig build benchmark
 ```
