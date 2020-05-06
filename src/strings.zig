@@ -12,32 +12,41 @@ const ascii_upper_end: usize = 90;
 const ascii_lower_start: usize = 97;
 const ascii_lower_end: usize = 122;
 
-pub const string = struct {
+pub const String = struct {
     buffer: []u8,
     allocator: *Allocator,
 
-    pub fn init(str: []const u8) !string {
+    pub fn init(str: []const u8) !String {
         var buf = try std.heap.c_allocator.alloc(u8, str.len);
         for (str) |c, i| {
             buf[i] = c;
         }
-        return string{
+        return String{
             .buffer = buf,
             .allocator = std.heap.c_allocator,
         };
     }
 
-    pub fn deinit(self: *const string) void {
+    pub fn set(self: *String, str: []const u8) !void {
+        var new_buff = try self.allocator.alloc(u8, str.len);
+        for (str) |c, i| {
+            new_buff[i] = c;
+        }
+        self.allocator.free(self.buffer);
+        self.buffer = new_buff;
+    }
+
+    pub fn deinit(self: *const String) void {
         self.allocator.free(self.buffer);
     }
 
     // return the size of the string
-    pub fn size(self: *const string) usize {
+    pub fn size(self: *const String) usize {
         return self.buffer.len;
     }
 
     // check if the string constains a substring
-    pub fn contains(self: *const string, subs: []const u8) bool {
+    pub fn contains(self: *const String, subs: []const u8) bool {
         const result = kmp(self, subs) catch unreachable;
         defer self.allocator.free(result);
         return result.len > 0;
@@ -45,19 +54,19 @@ pub const string = struct {
 
     // check if the string starts with the prefix
     // passed in as argument
-    pub fn startswith(self: *const string, pfx: []const u8) bool {
+    pub fn startswith(self: *const String, pfx: []const u8) bool {
         return mem.startsWith(u8, self.buffer, pfx);
     }
 
     // check if the string ends with the suffix
     // passed in as argument
-    pub fn endswith(self: *const string, sfx: []const u8) bool {
+    pub fn endswith(self: *const String, sfx: []const u8) bool {
         return mem.endsWith(u8, self.buffer, sfx);
     }
 
     // find all occurrences of a substring. returns a slice of indices
     // which indicate the beginning of a substring match.
-    pub fn find_all(self: *const string, needle: []const u8) ![]usize {
+    pub fn find_all(self: *const String, needle: []const u8) ![]usize {
         var indices: []usize = undefined;
         if (needle.len == 1 and needle[0] == ' ') {
             indices = try self.single_space_indices();
@@ -68,7 +77,7 @@ pub const string = struct {
     }
 
     // Knuth-Morris-Pratt substring search
-    pub fn kmp(self: *const string, needle: []const u8) ![]usize {
+    pub fn kmp(self: *const String, needle: []const u8) ![]usize {
         const m = needle.len;
 
         var border = try self.allocator.alloc(i64, m + 1);
@@ -109,7 +118,7 @@ pub const string = struct {
     }
 
     // compute the levenshtein edit distance to another string
-    pub fn levenshtein(self: *const string, other: []const u8) !usize {
+    pub fn levenshtein(self: *const String, other: []const u8) !usize {
         const prevrow = try self.allocator.alloc(usize, other.len + 1);
         const currrow = try self.allocator.alloc(usize, other.len + 1);
 
@@ -122,7 +131,7 @@ pub const string = struct {
     // compute the levenshtein distance to another string
     // this function expects pre-allocated buffers as input
     // the calling code is responsible for freeing this memory
-    pub fn buffered_levenshtein(self: *const string, other: []const u8, prevrow: []usize, currrow: []usize) usize {
+    pub fn buffered_levenshtein(self: *const String, other: []const u8, prevrow: []usize, currrow: []usize) usize {
         assert(prevrow.len >= other.len + 1);
         assert(currrow.len >= other.len + 1);
 
@@ -148,7 +157,7 @@ pub const string = struct {
     }
 
     // replace all instances of "before" with "after"
-    pub fn replace(self: *string, before: []const u8, after: []const u8) !void {
+    pub fn replace(self: *String, before: []const u8, after: []const u8) !void {
         const indices = try self.kmp(before);
         if (indices.len == 0) return;
         defer self.allocator.free(indices);
@@ -191,12 +200,12 @@ pub const string = struct {
     }
 
     // reverse the string
-    pub fn reverse(self: *const string) void {
+    pub fn reverse(self: *const String) void {
         mem.reverse(u8, self.buffer);
     }
 
     // convert all characters to lowercase
-    pub fn lower(self: *const string) void {
+    pub fn lower(self: *const String) void {
         for (self.buffer) |c, i| {
             if (ascii_upper_start <= c and c <= ascii_upper_end) {
                 self.buffer[i] = ascii_lower[@call(.{ .modifier = .always_inline }, upper_map, .{c})];
@@ -205,7 +214,7 @@ pub const string = struct {
     }
 
     // convert all characters to uppercase
-    pub fn upper(self: *const string) void {
+    pub fn upper(self: *const String) void {
         for (self.buffer) |c, i| {
             if (ascii_lower_start <= c and c <= ascii_lower_end) {
                 self.buffer[i] = ascii_upper[@call(.{ .modifier = .always_inline }, lower_map, .{c})];
@@ -214,7 +223,7 @@ pub const string = struct {
     }
 
     // convert all characters to their opposite case.
-    pub fn swapcase(self: *const string) void {
+    pub fn swapcase(self: *const String) void {
         for (self.buffer) |c, i| {
             if (ascii_lower_start <= c and c <= ascii_lower_end) {
                 self.buffer[i] = ascii_upper[@call(.{ .modifier = .always_inline }, lower_map, .{c})];
@@ -224,7 +233,7 @@ pub const string = struct {
         }
     }
 
-    pub fn concat(self: *string, other: []const u8) !void {
+    pub fn concat(self: *String, other: []const u8) !void {
         if (other.len == 0) return;
         const orig_len = self.buffer.len;
         self.buffer = try self.allocator.realloc(self.buffer, self.size() + other.len);
@@ -232,7 +241,7 @@ pub const string = struct {
     }
 
     // strip whitespace from both beginning and end of string
-    pub fn strip(self: *string) !void {
+    pub fn strip(self: *String) !void {
         var start: usize = 0;
         var end: usize = self.buffer.len;
 
@@ -268,7 +277,7 @@ pub const string = struct {
     }
 
     // strip whitespace from the left of the string
-    pub fn lstrip(self: *string) !void {
+    pub fn lstrip(self: *String) !void {
         var start: usize = 0;
         // find first occurence of non-whitespace char
         for (self.buffer) |c, i| {
@@ -289,7 +298,7 @@ pub const string = struct {
     }
 
     // strip whitespace from the right of the string
-    pub fn rstrip(self: *string) !void {
+    pub fn rstrip(self: *String) !void {
         var end: usize = self.buffer.len;
 
         // find last occurance of non-whitespace char
@@ -314,7 +323,7 @@ pub const string = struct {
 
     // split the string by a specified separator, returning
     // an ArrayList of []u8.
-    pub fn split_to_u8(self: *const string, sep: []const u8) ![][]const u8 {
+    pub fn split_to_u8(self: *const String, sep: []const u8) ![][]const u8 {
         const indices = try @call(.{ .modifier = .always_inline }, self.find_all, .{sep});
         defer self.allocator.free(indices);
 
@@ -332,7 +341,7 @@ pub const string = struct {
 
     // split the string by a specified separator, returning
     // an slice of string pointers.
-    pub fn split(self: *const string, sep: []const u8) ![]string {
+    pub fn split(self: *const String, sep: []const u8) ![]string {
         const indices = try self.find_all(sep);
         defer self.allocator.free(indices);
 
@@ -350,18 +359,18 @@ pub const string = struct {
     }
 
     // count the number of occurances of a substring
-    pub fn count(self: *const string, substr: []const u8) !usize {
+    pub fn count(self: *const String, substr: []const u8) !usize {
         const subs = try self.find_all(substr);
         defer self.allocator.free(subs);
         return subs.len;
     }
 
     // check if another string is equal to this one
-    pub fn equals(self: *const string, other: []const u8) bool {
+    pub fn equals(self: *const String, other: []const u8) bool {
         return mem.eql(u8, self.buffer, other);
     }
 
-    pub fn single_space_indices(self: *const string) ![]usize {
+    pub fn single_space_indices(self: *const String) ![]usize {
         var results = try self.allocator.alloc(usize, self.buffer.len);
         var i: usize = 0;
         for (self.buffer) |c, j| {
@@ -374,7 +383,7 @@ pub const string = struct {
         return results[0..];
     }
 
-    pub fn all_space_indices(self: *const string) ![]usize {
+    pub fn all_space_indices(self: *const String) ![]usize {
         var results = try self.allocator.alloc(usize, self.buffer.len);
         var i: usize = 0;
         for (self.buffer) |c, j| {
