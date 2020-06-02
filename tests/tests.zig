@@ -3,20 +3,20 @@ const assert = std.debug.assert;
 const mem = std.mem;
 
 const strings = @import("strings");
-const string = strings.string;
+const String = strings.String;
 
 test "strings.equals" {
-    const s = try string.init("this is a string");
+    const s = try String.init("this is a string");
     defer s.deinit();
     assert(s.equals("this is a string"));
 
-    const s2 = try string.init("");
+    const s2 = try String.init("");
     defer s2.deinit();
     assert(s2.equals(""));
 }
 
 test "strings.starts_endswith" {
-    const s = try string.init("this is some data to work with");
+    const s = try String.init("this is some data to work with");
     defer s.deinit();
 
     // startswith and endswith
@@ -28,7 +28,7 @@ test "strings.starts_endswith" {
 }
 
 test "strings.size" {
-    const s = try string.init("this is some data to work with");
+    const s = try String.init("this is some data to work with");
     defer s.deinit();
 
     assert(s.size() == 30);
@@ -36,7 +36,7 @@ test "strings.size" {
 
 test "strings.find_substring" {
     // find all instances of substrings
-    const s = try string.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
+    const s = try String.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
     defer s.deinit();
 
     const results = try s.find_all("some");
@@ -51,7 +51,7 @@ test "strings.find_substring" {
 }
 
 test "strings.upper_lower" {
-    const s = try string.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
+    const s = try String.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
     defer s.deinit();
 
     // upper and lowercase
@@ -60,7 +60,7 @@ test "strings.upper_lower" {
     s.upper();
     assert(mem.eql(u8, s.buffer, "THIS IS SOME MORE DATA, SOME SOME HEY HEY YO. APPLE DOG JUMP"));
 
-    const s2 = try string.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
+    const s2 = try String.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
     defer s2.deinit();
 
     // swap upper to lower and vice versa
@@ -70,25 +70,25 @@ test "strings.upper_lower" {
 
 test "strings.edit_distance" {
     // levenshtein edit distance
-    const s = try string.init("apple");
+    const s = try String.init("apple");
     defer s.deinit();
     assert((try s.levenshtein("snapple")) == 2);
 
-    const s2 = try string.init("book");
+    const s2 = try String.init("book");
     defer s2.deinit();
     assert((try s2.levenshtein("burn")) == 3);
 
-    const s3 = try string.init("pencil");
+    const s3 = try String.init("pencil");
     defer s3.deinit();
     assert((try s3.levenshtein("telephone")) == 8);
 
-    const s4 = try string.init("flowers");
+    const s4 = try String.init("flowers");
     defer s4.deinit();
     assert((try s4.levenshtein("wolf")) == 6);
 }
 
 test "strings.replace" {
-    var s = try string.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
+    var s = try String.init("this is some more data, SoMe some hey hey yo. APPLE DOG jump");
     defer s.deinit();
 
     // replace all instances of substring with another substring
@@ -104,7 +104,7 @@ test "strings.replace" {
 
 test "strings.reverse" {
     // reverse a string
-    const s = try string.init("this is a string");
+    const s = try String.init("this is a string");
     defer s.deinit();
 
     s.reverse();
@@ -112,7 +112,7 @@ test "strings.reverse" {
 }
 
 test "strings.concat" {
-    var s = try string.init("hello there ");
+    var s = try String.init("hello there ");
     defer s.deinit();
     try s.concat("friendo");
     assert(mem.eql(u8, s.buffer, "hello there friendo"));
@@ -120,19 +120,19 @@ test "strings.concat" {
 
 test "strings.strip" {
     // strip from the left
-    var s = try string.init("  \tthis is a string  \n\r");
+    var s = try String.init("  \tthis is a string  \n\r");
     defer s.deinit();
     try s.lstrip();
     assert(mem.eql(u8, s.buffer, "this is a string  \n\r"));
 
     // strip from the right
-    var s2 = try string.init("  \tthis is a string  \n\r");
+    var s2 = try String.init("  \tthis is a string  \n\r");
     defer s2.deinit();
     try s2.rstrip();
     assert(mem.eql(u8, s2.buffer, "  \tthis is a string"));
 
     // strip both
-    var s3 = try string.init("  \tthis is a string  \n\r");
+    var s3 = try String.init("  \tthis is a string  \n\r");
     defer s3.deinit();
     try s3.strip();
     assert(mem.eql(u8, s3.buffer, "this is a string"));
@@ -140,14 +140,14 @@ test "strings.strip" {
 
 test "strings.count" {
     // count the number of occurances of a substring
-    const s = try string.init("hello there, this is a string. strings are fun to play with.....string!!!!!");
+    const s = try String.init("hello there, this is a string. strings are fun to play with.....string!!!!!");
     defer s.deinit();
     assert((try s.count("string")) == 3);
 }
 
 test "strings.split" {
     // split a string into a slice of strings, with single space as separator
-    const s = try string.init("this is the string that I am going to split");
+    const s = try String.init("this is the string that I am going to split");
     defer s.deinit();
 
     const result = try s.split_to_u8(" ");
@@ -170,7 +170,7 @@ test "strings.split" {
     assert(result2[6].equals("am"));
     assert(result2[9].equals("split"));
 
-    const s2 = try string.init(moby);
+    const s2 = try String.init(moby);
     defer s2.deinit();
 
     const moby_split = try s2.split(" ");
@@ -182,7 +182,7 @@ test "strings.split" {
     }
     assert(moby_split.len == 198);
 
-    const s3 = try string.init(@embedFile("fixtures/moby_dick.txt"));
+    const s3 = try String.init(@embedFile("fixtures/moby_dick.txt"));
     defer s3.deinit();
 
     const moby_full_split = try s3.split(" ");
