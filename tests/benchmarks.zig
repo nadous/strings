@@ -1,7 +1,7 @@
 const std = @import("std");
 const Timer = std.time.Timer;
 const warn = std.debug.warn;
-const string = @import("strings").string;
+const String = @import("strings").String;
 
 pub fn main() !void {
     const test_cout = 1000;
@@ -11,7 +11,7 @@ pub fn main() !void {
 
     var timer = try Timer.start();
     var i: usize = 0;
-    const moby_full = try string.init(all_moby_dick);
+    const moby_full = try String.init(all_moby_dick);
 
     var results: [test_cout]usize = undefined;
 

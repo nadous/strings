@@ -2,8 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const mem = std.mem;
 
-const strings = @import("strings");
-const String = strings.String;
+const String = @import("strings").String;
 
 test "strings.equals" {
     const s = try String.init("this is a string");
