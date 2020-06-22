@@ -341,19 +341,19 @@ pub const String = struct {
 
     // split the string by a specified separator, returning
     // an slice of string pointers.
-    pub fn split(self: *const String, sep: []const u8) ![]string {
+    pub fn split(self: *const String, sep: []const u8) ![]String {
         const indices = try self.find_all(sep);
         defer self.allocator.free(indices);
 
-        var results = try self.allocator.alloc(string, indices.len + 1);
+        var results = try self.allocator.alloc(String, indices.len + 1);
         var i: usize = 0;
         for (indices) |n, j| {
-            results[j] = try string.init(self.buffer[i..n]);
+            results[j] = try String.init(self.buffer[i..n]);
             i = n + sep.len;
         }
 
         if (i < self.buffer.len) {
-            results[indices.len] = try string.init(self.buffer[i..]);
+            results[indices.len] = try String.init(self.buffer[i..]);
         }
         return results;
     }
