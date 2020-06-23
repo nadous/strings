@@ -6,7 +6,6 @@ const Allocator = mem.Allocator;
 
 const ascii_upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const ascii_lower = "abcdefghijklmnopqrstuvwxyz";
-
 const ascii_upper_start: usize = 65;
 const ascii_upper_end: usize = 90;
 const ascii_lower_start: usize = 97;

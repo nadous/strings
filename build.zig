@@ -1,5 +1,4 @@
-const std = @import("std");
-const Builder = std.build.Builder;
+const Builder = @import("std").build.Builder;
 
 pub fn build(b: *Builder) void {
     const build_mode = b.standardReleaseOptions();
@@ -9,7 +8,7 @@ pub fn build(b: *Builder) void {
     lib.linkLibC();
     lib.install();
 
-    const test_step = b.addTest("tests/tests.zig");
+    const test_step = b.addTest("test.zig");
     test_step.addPackagePath("strings", "src/strings.zig");
     test_step.setBuildMode(build_mode);
     test_step.linkLibrary(lib);
@@ -17,7 +16,7 @@ pub fn build(b: *Builder) void {
     const test_cmd = b.step("test", "Run the tests");
     test_cmd.dependOn(&test_step.step);
 
-    const benchmark_exe = b.addExecutable("benchmarks", "tests/benchmarks.zig");
+    const benchmark_exe = b.addExecutable("benchmark", "benchmark.zig");
     benchmark_exe.addPackagePath("strings", "src/strings.zig");
     benchmark_exe.setBuildMode(build_mode);
     benchmark_exe.linkLibrary(lib);
